@@ -1,13 +1,13 @@
-'From Cuis6.3 [latest update: #6253] on 19 March 2024 at 11:50:47 pm'!
+'From Cuis6.3 [latest update: #6253] on 20 March 2024 at 11:26:20 pm'!
 'Description '!
-!provides: 'Annotations' 1 83!
+!provides: 'Annotations' 1 95!
 !requires: 'YAXO' 1 24 nil!
 SystemOrganization addCategory: #Annotations!
 
 
 !classDefinition: #AnnotatedTextModel category: #Annotations!
 TextModel subclass: #AnnotatedTextModel
-	instanceVariableNames: ''
+	instanceVariableNames: 'author'
 	classVariableNames: ''
 	poolDictionaries: ''
 	category: 'Annotations'!
@@ -47,7 +47,7 @@ AnnotatedTextEditor class
 
 !classDefinition: #AnnotatedTextMorph category: #Annotations!
 LayoutMorph subclass: #AnnotatedTextMorph
-	instanceVariableNames: 'textModelMorph commentsMorph selectedConversation annotatedTextModel showResolvedConversations'
+	instanceVariableNames: 'textModelMorph commentsMorph selectedConversation annotatedTextModel showResolvedConversations author'
 	classVariableNames: ''
 	poolDictionaries: ''
 	category: 'Annotations'!
@@ -127,8 +127,16 @@ acceptContentsFrom: aTextModelMorph
 	
 	^true! !
 
-!AnnotatedTextModel methodsFor: 'as yet unclassified' stamp: 'DF 3/19/2024 23:03:47'!
-addConversationBy: author firstComment: aString from: start to: end
+!AnnotatedTextModel methodsFor: 'as yet unclassified' stamp: 'DF 3/20/2024 21:28:42'!
+addComment: aString to: aConversation 
+
+	aConversation addComment:aString by:author.
+
+	self changed: #annotations.
+! !
+
+!AnnotatedTextModel methodsFor: 'as yet unclassified' stamp: 'DF 3/20/2024 21:28:33'!
+addConversation: aString from: start to: end
 
 	actualContents addConversationBy: author firstComment: aString from: start to: end.
 	
@@ -146,6 +154,10 @@ annotations
 	
 	^ actualContents annotations! !
 
+!AnnotatedTextModel methodsFor: 'as yet unclassified' stamp: 'DF 3/20/2024 21:28:54'!
+author: aString
+	author := aString! !
+
 !AnnotatedTextModel methodsFor: 'as yet unclassified' stamp: 'DF 3/19/2024 14:35:37'!
 refusesToAccept
 	^false! !
@@ -161,12 +173,31 @@ acceptContentsFrom: aTextModelMorph
 		
 	^ super acceptContentsFrom: aTextModelMorph ! !
 
-!PluggableAnnotatedTextModel methodsFor: 'as yet unclassified' stamp: 'DF 3/19/2024 23:13:10'!
+!PluggableAnnotatedTextModel methodsFor: 'as yet unclassified' stamp: 'DF 3/20/2024 20:18:42'!
 actualContents
 
 	actualContents ifNil: [ self refetch ].
 	
+	self assert: (actualContents isKindOf: AnnotatedText).
 	^actualContents ! !
+
+!PluggableAnnotatedTextModel methodsFor: 'as yet unclassified' stamp: 'DF 3/20/2024 21:23:16'!
+addComment: aString to: aConversation 
+
+	super addComment: aString to: aConversation.
+
+	provider perform: setter with: actualContents. "to notify the provider that a change has occurred"
+		
+! !
+
+!PluggableAnnotatedTextModel methodsFor: 'as yet unclassified' stamp: 'DF 3/20/2024 21:28:16'!
+addConversation: aString from: start to: end
+
+	super addConversation: aString from: start to: end.
+	
+	provider perform: setter with: actualContents. "to notify the provider that a change has occurred"
+	
+	! !
 
 !PluggableAnnotatedTextModel methodsFor: 'as yet unclassified' stamp: 'DF 3/19/2024 23:29:36'!
 basicActualContents: aTextOrString
@@ -280,14 +311,14 @@ asXML
 	^ aWriteStream contents
 ! !
 
-!AnnotatedText methodsFor: 'as yet unclassified' stamp: 'DF 3/19/2024 23:40:16'!
+!AnnotatedText methodsFor: 'as yet unclassified' stamp: 'DF 3/20/2024 20:56:02'!
 decodeXML: anXMLNode
 
 	annotations := OrderedCollection new.
 		
 	anXMLNode firstTagNamed: #text with: [:node | 
 		
-		self setString: node characterData setRuns: (RunArray new: 0 withAll: #()) . true ].
+		self setString: node characterData setRuns: (RunArray new: node characterData size withAll: #()) . true ].
 	
 	anXMLNode firstTagNamed: #annotations with:[:node |
 		node elementsDo: [:each | 
@@ -358,12 +389,12 @@ acceptContents
 	
 	^super acceptContents ! !
 
-!AnnotatedTextEditor methodsFor: 'as yet unclassified' stamp: 'DF 3/19/2024 21:53:29'!
+!AnnotatedTextEditor methodsFor: 'as yet unclassified' stamp: 'DF 3/20/2024 21:26:12'!
 addComment
 
 	StringRequestMorph
 		request: 'Enter a comment'
-		do: [:aString | model addConversationBy: 'Alice' firstComment: aString from: self startIndex  to: self stopIndex. model changed: #annotations ].
+		do: [:aString | model addConversation: aString from: self startIndex  to: self stopIndex ].
 ! !
 
 !AnnotatedTextEditor methodsFor: 'as yet unclassified' stamp: 'DF 3/16/2024 21:59:44'!
@@ -380,14 +411,14 @@ getMenu
 		
 	^aMenu	! !
 
-!AnnotatedTextMorph methodsFor: 'as yet unclassified' stamp: 'DF 3/19/2024 21:35:21'!
+!AnnotatedTextMorph methodsFor: 'as yet unclassified' stamp: 'DF 3/20/2024 21:23:16'!
 addComment
 	
 	selectedConversation ifNil:[^self].
 	
 	StringRequestMorph
 		request: 'Enter a comment'
-		do: [:aString | selectedConversation addComment:aString by:'Alice'  ].
+		do: [:aString | annotatedTextModel addComment:aString to: selectedConversation ].
 		
 	
 		
@@ -402,7 +433,11 @@ annotations
 		
 	^ (annotatedTextModel annotations reject:[:each | each resolved ]) collect: [:each | ConversationWrapper with: each model:self ].! !
 
-!AnnotatedTextMorph methodsFor: 'as yet unclassified' stamp: 'DF 3/19/2024 21:53:29'!
+!AnnotatedTextMorph methodsFor: 'as yet unclassified' stamp: 'DF 3/20/2024 21:18:23'!
+author: aString
+	author := aString! !
+
+!AnnotatedTextMorph methodsFor: 'as yet unclassified' stamp: 'DF 3/20/2024 21:55:01'!
 buildGUI
 
 	commentsMorph := HierarchicalListMorph model: self listGetter: #annotations indexGetter: #selection indexSetter: #selection: mainView: self menuGetter:#conversationMenu keystrokeAction:nil.
@@ -411,13 +446,14 @@ buildGUI
 	
 	textModelMorph := TextModelMorph withModel: annotatedTextModel.
 	
-	self addMorph: (textModelMorph pw:0.6;ph:1.0).
-	self addMorph: (commentsMorph pw:0.4 ; ph:1.0).
+	self addMorph: (textModelMorph pw:0.75;ph:1.0).
+	self addAdjusterMorph.
+	self addMorph: (commentsMorph pw:0.25 ; ph:1.0).
 
 
 ! !
 
-!AnnotatedTextMorph methodsFor: 'as yet unclassified' stamp: 'DF 3/19/2024 14:55:51'!
+!AnnotatedTextMorph methodsFor: 'as yet unclassified' stamp: 'DF 3/20/2024 22:57:12'!
 conversationMenu
 
 	| menu |
@@ -427,9 +463,11 @@ conversationMenu
 
 	menu addLine.
 	
-	menu add: 'Resolve' target: self action: #resolveConversation.
-
-	menu add: 'Unresolve' target: self action: #unresolveConversation.
+	selectedConversation isKindOf: AnnotationWrapper ::
+		ifTrue:[
+			selectedConversation resolved not :: 
+				ifTrue:[ 	menu add: 'Resolve' target: self action: #resolveConversation ]
+				ifFalse:[	menu add: 'Unresolve' target: self action: #unresolveConversation ] ].
 	
 	menu addLine.
 	
@@ -457,12 +495,14 @@ editComment
 	
 	! !
 
-!AnnotatedTextMorph methodsFor: 'as yet unclassified' stamp: 'DF 3/19/2024 17:26:35'!
+!AnnotatedTextMorph methodsFor: 'as yet unclassified' stamp: 'DF 3/20/2024 21:20:44'!
 initialize
 	
 	super initialize.
 	
 	self beRow.
+	
+	author := 'Authorus Anonymous'.
 	
 	showResolvedConversations := false.
 
@@ -492,7 +532,7 @@ selection
 
 	^selectedConversation ! !
 
-!AnnotatedTextMorph methodsFor: 'as yet unclassified' stamp: 'DF 3/19/2024 21:53:29'!
+!AnnotatedTextMorph methodsFor: 'as yet unclassified' stamp: 'DF 3/20/2024 21:48:31'!
 selection: aConversationWrapper
 	
 	aConversationWrapper ifNil:[^self].
@@ -501,9 +541,11 @@ selection: aConversationWrapper
 	
 	selectedConversation isKindOf: AnnotationWrapper :: ifFalse:[^self].
 	
-	textModelMorph selectFrom: selectedConversation start to: selectedConversation stop. 
+	textModelMorph selectFrom: selectedConversation start to: selectedConversation stop - 1. 
 	
 	self changed: #annotations.
+	
+	textModelMorph focusText.
 	
 	textModelMorph redrawNeeded.! !
 
@@ -541,33 +583,23 @@ on: anAnnotatedTextModel
 	
 	^aMorph! !
 
-!AnnotatedTextMorph class methodsFor: 'instance creation' stamp: 'DF 3/19/2024 23:09:07'!
-textProvider: model textGetter: getter textSetter: setter 
+!AnnotatedTextMorph class methodsFor: 'instance creation' stamp: 'DF 3/20/2024 21:30:02'!
+textProvider: model textGetter: getter textSetter: setter author: author
 
 	| anAnnotatedTextModel |
 	
 	anAnnotatedTextModel := PluggableAnnotatedTextModel new.
 	
-	anAnnotatedTextModel provider: model; get: getter ; set: setter.
+	anAnnotatedTextModel provider: model; get: getter ; set: setter ; author: author.
 	
 	model addDependent: anAnnotatedTextModel.
 	
 	^self on: anAnnotatedTextModel.
 ! !
 
-!AnnotatedTextMorph class methodsFor: 'instance creation' stamp: 'DF 3/19/2024 22:28:36'!
-textProvider: model textGetter: getter textSetter: setter annotationGetter: asetter
-
-	| anAnnotatedTextModel |
-	
-	anAnnotatedTextModel := PluggableAnnotatedTextModel new.
-	
-	anAnnotatedTextModel provider: model; get: getter ; set: setter ; annotationGetter: asetter.
-	
-	model addDependent: anAnnotatedTextModel.
-	
-	^self on: anAnnotatedTextModel.
-! !
+!AnnotationWrapper methodsFor: 'as yet unclassified' stamp: 'DF 3/20/2024 22:54:47'!
+resolved
+	^self subclassResponsibility ! !
 
 !CommentWrapper methodsFor: 'as yet unclassified' stamp: 'DF 3/16/2024 20:09:51'!
 addComment: aString by: author
@@ -591,6 +623,10 @@ contents
 !CommentWrapper methodsFor: 'as yet unclassified' stamp: 'DF 3/19/2024 18:06:55'!
 resolve: aBoolean
 	model resolve: aBoolean! !
+
+!CommentWrapper methodsFor: 'as yet unclassified' stamp: 'DF 3/20/2024 22:55:05'!
+resolved
+	^model resolved! !
 
 !CommentWrapper methodsFor: 'as yet unclassified' stamp: 'DF 3/16/2024 20:07:08'!
 start
@@ -616,6 +652,10 @@ contents
 !ConversationWrapper methodsFor: 'as yet unclassified' stamp: 'DF 3/19/2024 14:51:42'!
 resolve: aBoolean
 	item resolved: aBoolean! !
+
+!ConversationWrapper methodsFor: 'as yet unclassified' stamp: 'DF 3/20/2024 22:55:15'!
+resolved
+	^item resolved! !
 
 !ConversationWrapper methodsFor: 'as yet unclassified' stamp: 'DF 3/16/2024 20:07:43'!
 start
@@ -728,6 +768,10 @@ hash
 
 	^ (author hash bitXor: comment hash) bitXor: date hash.! !
 
+!TextComment methodsFor: 'as yet unclassified' stamp: 'DF 3/20/2024 23:24:08'!
+icon
+	^nil! !
+
 !TextComment class methodsFor: 'as yet unclassified' stamp: 'DF 3/18/2024 23:14:41'!
 fromXML: anXMLNode
 
@@ -797,6 +841,10 @@ header
 	
 	^ s
 	! !
+
+!TextConversation methodsFor: 'as yet unclassified' stamp: 'DF 3/20/2024 23:25:46'!
+icon
+	^Theme current chatIcon! !
 
 !TextConversation methodsFor: 'as yet unclassified' stamp: 'DF 3/19/2024 14:44:05'!
 initialize
