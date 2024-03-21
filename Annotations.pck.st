@@ -1,6 +1,6 @@
-'From Cuis6.3 [latest update: #6253] on 21 March 2024 at 12:14:03 am'!
+'From Cuis6.0 [latest update: #6153] on 21 March 2024 at 3:40:26 pm'!
 'Description '!
-!provides: 'Annotations' 1 95!
+!provides: 'Annotations' 1 101!
 !requires: 'YAXO' 1 24 nil!
 SystemOrganization addCategory: #Annotations!
 
@@ -257,14 +257,14 @@ insert: length at: begin
 	annotations do:[:each |each insert:length at:begin].
 ! !
 
-!AnnotatedText methodsFor: 'private' stamp: 'DF 3/19/2024 23:00:50'!
+!AnnotatedText methodsFor: 'private' stamp: 'DF 3/21/2024 15:39:48'!
 removeFrom: begin to: end
-
+	
 	self assert: begin >= 1.
 	
 	self assert: begin <= end.
 	
-	self assert: end <= self size.
+	self assert: end <= (self size + 1).
 	
 	annotations := annotations reject:[:each | each coveredBy: begin to:end].
 	
@@ -354,14 +354,15 @@ initialize
 	annotations := OrderedCollection new.
 ! !
 
-!AnnotatedText methodsFor: 'as yet unclassified' stamp: 'DF 3/19/2024 23:01:36'!
+!AnnotatedText methodsFor: 'as yet unclassified' stamp: 'DF 3/21/2024 15:39:31'!
 replaceFrom: start to: stop with: replacement
 	
-	super replaceFrom: start to: stop with: replacement.
-		
 	start <= stop ifTrue:[ self removeFrom: start to: stop].
 	
 	self insert: replacement size at: start.
+	
+	super replaceFrom: start to: stop with: replacement.
+
 	
 	
 	
@@ -396,6 +397,15 @@ addComment
 		request: 'Enter a comment'
 		do: [:aString | model addConversation: aString from: self startIndex  to: self stopIndex ].
 ! !
+
+!AnnotatedTextEditor methodsFor: 'as yet unclassified' stamp: 'DF 3/21/2024 15:40:21'!
+backspace: aKeyboardEvent
+
+	^super backspace: aKeyboardEvent .
+	
+	
+	
+	! !
 
 !AnnotatedTextEditor methodsFor: 'as yet unclassified' stamp: 'DF 3/16/2024 21:59:44'!
 getMenu
