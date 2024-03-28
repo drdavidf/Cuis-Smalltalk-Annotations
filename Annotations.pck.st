@@ -1,6 +1,6 @@
-'From Cuis6.0 [latest update: #6153] on 21 March 2024 at 3:40:26 pm'!
+'From Cuis6.0 [latest update: #6153] on 28 March 2024 at 3:00:51 pm'!
 'Description '!
-!provides: 'Annotations' 1 101!
+!provides: 'Annotations' 1 110!
 !requires: 'YAXO' 1 24 nil!
 SystemOrganization addCategory: #Annotations!
 
@@ -225,6 +225,10 @@ initialize
 	super initialize .
 	! !
 
+!PluggableAnnotatedTextModel methodsFor: 'as yet unclassified' stamp: 'DF 3/28/2024 14:53:47'!
+provider
+	^provider! !
+
 !PluggableAnnotatedTextModel methodsFor: 'as yet unclassified' stamp: 'DF 3/19/2024 17:48:23'!
 provider: anObject
 	provider := anObject! !
@@ -256,6 +260,21 @@ insert: length at: begin
 
 	annotations do:[:each |each insert:length at:begin].
 ! !
+
+!AnnotatedText methodsFor: 'private' stamp: 'DF 3/28/2024 12:41:55'!
+isAtCloseTag: anInteger 
+
+	^anInteger <= self size and:[ (self at: anInteger) = $>].! !
+
+!AnnotatedText methodsFor: 'private' stamp: 'DF 3/28/2024 12:48:11'!
+isAtOpenTag: anInteger 
+
+	anInteger = 1 ifTrue:
+	 	[^(self at:1 ) = $<].  "a tag on the very first charater cannot have an escape char before it"
+	
+	" it must be that anInteger > 1 "
+	
+	^ anInteger <= self size and:[(self at: anInteger - 1) ~= $\] and:[(self at: anInteger) = $<].! !
 
 !AnnotatedText methodsFor: 'private' stamp: 'DF 3/21/2024 15:39:48'!
 removeFrom: begin to: end
@@ -346,6 +365,29 @@ encodeXML: anXMLWriter
 	
 	anXMLWriter endTag: 'body'.! !
 
+!AnnotatedText methodsFor: 'as yet unclassified' stamp: 'DF 3/28/2024 13:44:25'!
+format: aDictionary
+
+	| e |
+	
+	e := 1.
+	
+	[e <= self size] whileTrue:[
+		self isAtOpenTag: e :: ifTrue:[ | key b |
+			key := WriteStream on:''.
+			b := e.
+			e := e + 1.
+			[e <= self size and: [ self isAtCloseTag: e :: not ] ] whileTrue:[
+				key nextPut: (self at:e).
+				e := e + 1 ].
+			e <= self size 		ifTrue:[  " therefore it must be that self at:p = $>"
+				e := e + 1.
+				aDictionary at: key contents 			ifPresent:[:value | 					
+					self replaceFrom: b to: e - 1 with: value. 
+					e := b + value size] ] ]
+			ifFalse:[ e := e + 1 ] ].
+		! !
+
 !AnnotatedText methodsFor: 'as yet unclassified' stamp: 'DF 3/19/2024 22:59:44'!
 initialize
 
@@ -354,7 +396,11 @@ initialize
 	annotations := OrderedCollection new.
 ! !
 
-!AnnotatedText methodsFor: 'as yet unclassified' stamp: 'DF 3/21/2024 15:39:31'!
+!AnnotatedText methodsFor: 'as yet unclassified' stamp: 'DF 3/28/2024 14:05:19'!
+isByteString
+	^true! !
+
+!AnnotatedText methodsFor: 'as yet unclassified' stamp: 'DF 3/28/2024 13:51:09'!
 replaceFrom: start to: stop with: replacement
 	
 	start <= stop ifTrue:[ self removeFrom: start to: stop].
@@ -447,12 +493,14 @@ annotations
 author: aString
 	author := aString! !
 
-!AnnotatedTextMorph methodsFor: 'as yet unclassified' stamp: 'DF 3/20/2024 21:55:01'!
+!AnnotatedTextMorph methodsFor: 'as yet unclassified' stamp: 'DF 3/28/2024 15:00:14'!
 buildGUI
 
 	commentsMorph := HierarchicalListMorph model: self listGetter: #annotations indexGetter: #selection indexSetter: #selection: mainView: self menuGetter:#conversationMenu keystrokeAction:nil.
 	 
 	annotatedTextModel addDependent: commentsMorph.
+	
+	annotatedTextModel addDependent: self.
 	
 	textModelMorph := TextModelMorph withModel: annotatedTextModel.
 	
@@ -460,7 +508,7 @@ buildGUI
 	self addAdjusterMorph.
 	self addMorph: (commentsMorph pw:0.25 ; ph:1.0).
 
-
+	self update: nil.	
 ! !
 
 !AnnotatedTextMorph methodsFor: 'as yet unclassified' stamp: 'DF 3/20/2024 22:57:12'!
@@ -488,6 +536,10 @@ conversationMenu
 	^ menu
 ! !
 
+!AnnotatedTextMorph methodsFor: 'as yet unclassified' stamp: 'DF 3/28/2024 14:46:03'!
+disableEditing
+	textModelMorph disableEditing.! !
+
 !AnnotatedTextMorph methodsFor: 'as yet unclassified' stamp: 'DF 3/19/2024 21:53:29'!
 editComment
 	
@@ -504,6 +556,10 @@ editComment
 		
 	
 	! !
+
+!AnnotatedTextMorph methodsFor: 'as yet unclassified' stamp: 'DF 3/28/2024 14:46:13'!
+enableEditing
+	textModelMorph enableEditing.! !
 
 !AnnotatedTextMorph methodsFor: 'as yet unclassified' stamp: 'DF 3/20/2024 21:20:44'!
 initialize
@@ -702,6 +758,28 @@ testEmpty
 
 	self assert: c start = 9. 
 	self assert: c stop = 8.
+! !
+
+!TestAnnotatedText methodsFor: 'as yet unclassified' stamp: 'DF 3/28/2024 12:49:01'!
+testFormat
+
+	| t1 t2 t3 t4 |
+	
+	t1 := AnnotatedText fromString: 'was brillig, and the slithy toves Did gyre and gimble in the wabe:'.
+
+	t2 := AnnotatedText fromString: 'was brillig, and the slithy toves Did gyre and gimble in the wabe:'.
+	
+	t2 format: { 'role' -> 'customer' . 'action' -> 'open the radio' } asDictionary.
+	
+	self assert: t1 equals: t2.
+	
+	t3 := AnnotatedText fromString: 'as a <role> I would \< not a tag > like >to <action> so that I can <reason>.'.
+
+	t4 := AnnotatedText fromString: 'as a customer I would \< not a tag > like >to open the radio so that I can <reason>.'.
+	
+	t3 format: { 'role' -> 'customer' . 'action' -> 'open the radio' } asDictionary.
+	
+	self assert: t3 equals: t4.
 ! !
 
 !TestAnnotatedText methodsFor: 'as yet unclassified' stamp: 'DF 3/19/2024 23:35:59'!
